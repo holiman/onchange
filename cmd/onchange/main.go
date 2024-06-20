@@ -104,8 +104,16 @@ func onchange(c *cli.Context) error {
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			slog.Info("Command errored", "err", err)
+		}
+		go stdin.Write([]byte(fmt.Sprintf("%s\n", status)))
 		slog.Info("Running", "cmd", cmd.String())
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Start(); err != nil {
+			slog.Info("Command errored", "err", err)
+		}
+		if err := cmd.Wait(); err != nil {
 			slog.Info("Command errored", "err", err)
 		}
 	}
