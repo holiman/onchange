@@ -1,13 +1,24 @@
 ## `onchange`
 
-`onchange` is a utility to do things when files change.
+`onchange` is a utility to do things when files change. And not only files, it
+can react to changes in ports, or webpages.
 
-### Examples
+So, if you want to be notified (via the excellent [ntfy](https://ntfy.sh/)) if a
+server shuts down, taking down the ssh port:
+```
+onchange tcp://myserver.my.domain:22 curl -d "Someting happened" ntfy.sh/mytopic
+```
+
+Or same thing for websites
 
 ```
-onchange ./output.jsonl notify-send '`thing changed now'
+onchange https://webpage.domain/index.html curl -d "Webpage updated" ntfy.sh/mytopic
 ```
+Or, of course, for local files
 
+```
+onchange ./output.jsonl notify-send 'file was changed now'
+```
 
 Note, this utility does not do shell expansion, so things like pipes
 does _not_ work:

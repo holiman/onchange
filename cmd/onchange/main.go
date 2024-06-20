@@ -14,6 +14,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"os/signal"
 	"strings"
+	"time"
 )
 
 var (
@@ -31,6 +32,11 @@ var (
 		Name:  "output",
 		Usage: "Where to direct both stdout- and stderr-output from the executed command",
 	}
+	intervalFlag = &cli.DurationFlag{
+		Name:  "polling",
+		Usage: "How long to wait between rechecks (for polling checks: tcp/web), default is 5m",
+		Value: 5 * time.Minute,
+	}
 )
 
 func initApp() *cli.App {
@@ -43,6 +49,7 @@ func initApp() *cli.App {
 		outFlag,
 		stdoutFlag,
 		stderrFlag,
+		intervalFlag,
 	}
 	app.Action = onchange
 	app.Commands = []*cli.Command{}
@@ -103,16 +110,18 @@ func onchange(c *cli.Context) error {
 		}
 	}
 
-	var w watch.Watch
+	var w watch.Watcher
 	// Is it an HTTP URL?
 	if strings.HasPrefix(subject, "http://") || strings.HasPrefix(subject, "https://") {
-		if ww, err := watch.NewWebWatcher(subject, callback); err != nil {
+		if ww, err := watch.NewWebWatcher(subject, c.Duration(intervalFlag.Name), callback); err != nil {
 			return err
 		} else {
 			w = ww
 		}
 	} else if strings.HasPrefix(subject, "tcp://") {
-		if ww, err := watch.NewTcpWatcher(strings.TrimPrefix(subject, "tcp://"), callback); err != nil {
+		if ww, err := watch.NewTcpWatcher(strings.TrimPrefix(subject, "tcp://"),
+			c.Duration(intervalFlag.Name),
+			callback); err != nil {
 			return err
 		} else {
 			w = ww

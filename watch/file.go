@@ -20,7 +20,7 @@ type fileWatcher struct {
 	w        *fsnotify.Watcher
 }
 
-func NewFileWatcher(subject string, fn func(string)) (Watch, error) {
+func NewFileWatcher(subject string, fn func(string)) (Watcher, error) {
 	if st, err := os.Lstat(subject); err != nil {
 		return nil, err
 	} else if st.IsDir() {
@@ -31,7 +31,7 @@ func NewFileWatcher(subject string, fn func(string)) (Watch, error) {
 		slog.Error("Failed to start filesystem watcher", "err", err)
 		return nil, err
 	}
-	// Watch the directory, not the file itself.
+	// Monitor the directory, not the file itself.
 	if err = w.Add(filepath.Dir(subject)); err != nil {
 		return nil, fmt.Errorf("%q: %s", subject, err)
 	}

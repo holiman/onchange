@@ -13,12 +13,14 @@ import (
 
 type tcpWatcher struct {
 	subject  string
-	dialer   *net.Dialer
 	callback func(string)
 	closeCh  chan any
+	waitTime time.Duration
+
+	dialer *net.Dialer
 }
 
-func NewTcpWatcher(subject string, fn func(status string)) (Watch, error) {
+func NewTcpWatcher(subject string, waitTime time.Duration, fn func(status string)) (Watcher, error) {
 	if _, err := net.ResolveTCPAddr("tcp", subject); err != nil {
 		return nil, fmt.Errorf("address resolution error: %v (input %v)", err, subject)
 	}
@@ -30,42 +32,43 @@ func NewTcpWatcher(subject string, fn func(status string)) (Watch, error) {
 		dialer:   dialer,
 		callback: fn,
 		closeCh:  make(chan any),
+		waitTime: waitTime,
 	}, nil
 }
 
-func (t *tcpWatcher) Stop() {
-	close(t.closeCh)
+func (w *tcpWatcher) Stop() {
+	close(w.closeCh)
 }
-func (t *tcpWatcher) Start() {
-	go t.loop()
+func (w *tcpWatcher) Start() {
+	go w.loop()
 }
 
 // loop starts monitoring the given tcp file for changes, and invokes fn
 // on changes. The implementation checks the port by default once per five minutes.
 // A change is whenever the error-return from a connection attempt changes. This
 // means that changes in open->closed or closed->filtered will trigger the callback.
-func (t *tcpWatcher) loop() {
-	waitTimer := time.NewTimer(5 * time.Minute)
+func (w *tcpWatcher) loop() {
+	waitTimer := time.NewTimer(w.waitTime)
 	defer waitTimer.Stop()
-	status := t.status()
-	slog.Info("TCP initial status", "subject", t.subject, "status", status)
+	status := w.status()
+	slog.Info("TCP initial status", "subject", w.subject, "status", status)
 	for {
 		select {
 		case <-waitTimer.C:
-			waitTimer.Reset(5 * time.Minute)
-		case <-t.closeCh:
+			waitTimer.Reset(w.waitTime)
+		case <-w.closeCh:
 			return
 		}
-		if newStatus := t.status(); newStatus != status {
-			slog.Info("Port change detected", "address", t.subject, "status", newStatus, "previous", status)
+		if newStatus := w.status(); newStatus != status {
+			slog.Info("Port change detected", "address", w.subject, "status", newStatus, "previous", status)
 			status = newStatus
-			t.callback(status)
+			w.callback(status)
 		}
 	}
 }
 
-func (t *tcpWatcher) status() string {
-	conn, err := t.dialer.Dial("tcp", t.subject)
+func (w *tcpWatcher) status() string {
+	conn, err := w.dialer.Dial("tcp", w.subject)
 	if err != nil {
 		return err.Error()
 	}

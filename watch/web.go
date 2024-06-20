@@ -18,9 +18,10 @@ type webWatcher struct {
 	subject  string
 	callback func(string)
 	closeCh  chan any
+	waitTime time.Duration
 }
 
-func NewWebWatcher(subject string, fn func(status string)) (Watch, error) {
+func NewWebWatcher(subject string, waitTime time.Duration, fn func(status string)) (Watcher, error) {
 	if _, err := url.Parse(subject); err != nil {
 		return nil, err
 	}
@@ -28,6 +29,7 @@ func NewWebWatcher(subject string, fn func(status string)) (Watch, error) {
 		subject:  subject,
 		callback: fn,
 		closeCh:  make(chan any),
+		waitTime: waitTime,
 	}, nil
 }
 
@@ -41,7 +43,7 @@ func (w *webWatcher) Start() {
 // loop starts monitoring the HTTP URL, and invokes fn
 // on changes. The implementation checks by default once per five minutes.
 func (w *webWatcher) loop() {
-	waitTimer := time.NewTimer(5 * time.Minute)
+	waitTimer := time.NewTimer(w.waitTime)
 	defer waitTimer.Stop()
 	status := w.status()
 	slog.Info("HTTP initial status", "subject", w.subject, "status", status)
@@ -62,7 +64,10 @@ func (w *webWatcher) loop() {
 }
 
 func (w *webWatcher) status() (status string) {
-	resp, err := http.Get(w.subject)
+	cli := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := cli.Get(w.subject)
 	if err != nil {
 		status = err.Error()
 	} else {

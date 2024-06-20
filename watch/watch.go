@@ -4,7 +4,7 @@
 
 package watch
 
-type Watch interface {
+type Watcher interface {
 	Start()
 	Stop()
 }
