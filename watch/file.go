@@ -22,7 +22,12 @@ type fileWatcher struct {
 
 func NewFileWatcher(subject string, fn func(string)) (Watcher, error) {
 	if st, err := os.Lstat(subject); err != nil {
-		return nil, err
+		// It's ok with non-existent files, but pass on other errors
+		if os.IsNotExist(err) {
+			slog.Info("Watch subject does not (yet) exist", "subject", subject)
+		} else {
+			return nil, err
+		}
 	} else if st.IsDir() {
 		return nil, fmt.Errorf("%q is a directory, not a file", subject)
 	}
