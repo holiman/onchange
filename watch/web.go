@@ -11,22 +11,25 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
 type webWatcher struct {
 	subject  string
+	content  string
 	callback func(string)
 	closeCh  chan any
 	waitTime time.Duration
 }
 
-func NewWebWatcher(subject string, waitTime time.Duration, fn func(status string)) (Watcher, error) {
+func NewWebWatcher(subject string, waitTime time.Duration, fn func(status string), contentWatch string) (Watcher, error) {
 	if _, err := url.Parse(subject); err != nil {
 		return nil, err
 	}
 	return &webWatcher{
 		subject:  subject,
+		content:  contentWatch,
 		callback: fn,
 		closeCh:  make(chan any),
 		waitTime: waitTime,
@@ -46,11 +49,11 @@ func (w *webWatcher) loop() {
 	waitTimer := time.NewTimer(w.waitTime)
 	defer waitTimer.Stop()
 	status := w.status()
-	slog.Info("HTTP initial status", "subject", w.subject, "status", status)
+	slog.Info("HTTP initial status", "subject", w.subject, "status", status, "polling time", w.waitTime)
 	for {
 		select {
 		case <-waitTimer.C:
-			waitTimer.Reset(5 * time.Minute)
+			waitTimer.Reset(w.waitTime)
 		case <-w.closeCh:
 			return
 		}
@@ -69,11 +72,15 @@ func (w *webWatcher) status() (status string) {
 	}
 	resp, err := cli.Get(w.subject)
 	if err != nil {
-		status = err.Error()
-	} else {
-		data, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		status = fmt.Sprintf("%d:%#x", resp.StatusCode, sha256.Sum256(data))
+		return err.Error()
 	}
-	return status
+	data, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if w.content == "" {
+		return fmt.Sprintf("%d:%#x", resp.StatusCode, sha256.Sum256(data))
+	}
+	if strings.Contains(string(data), w.content) {
+		return fmt.Sprintf("%d:content present", resp.StatusCode)
+	}
+	return fmt.Sprintf("%d:content missing", resp.StatusCode)
 }

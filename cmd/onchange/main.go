@@ -32,6 +32,10 @@ var (
 		Name:  "output",
 		Usage: "Where to direct both stdout- and stderr-output from the executed command",
 	}
+	contentFlag = &cli.StringFlag{
+		Name:  "web.content",
+		Usage: "If set, the (web-)watcher will look for the specified content in the given file/webpage, and only alert if the content appears/disappears.",
+	}
 	intervalFlag = &cli.DurationFlag{
 		Name:  "polling",
 		Usage: "How long to wait between rechecks (for polling checks: tcp/web), default is 5m",
@@ -50,6 +54,7 @@ func initApp() *cli.App {
 		stdoutFlag,
 		stderrFlag,
 		intervalFlag,
+		contentFlag,
 	}
 	app.Action = onchange
 	app.Commands = []*cli.Command{}
@@ -121,7 +126,7 @@ func onchange(c *cli.Context) error {
 	var w watch.Watcher
 	// Is it an HTTP URL?
 	if strings.HasPrefix(subject, "http://") || strings.HasPrefix(subject, "https://") {
-		if ww, err := watch.NewWebWatcher(subject, c.Duration(intervalFlag.Name), callback); err != nil {
+		if ww, err := watch.NewWebWatcher(subject, c.Duration(intervalFlag.Name), callback, c.String(contentFlag.Name)); err != nil {
 			return err
 		} else {
 			w = ww
