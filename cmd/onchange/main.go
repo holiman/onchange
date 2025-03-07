@@ -13,6 +13,7 @@ import (
 	"github.com/holiman/onchange/watch"
 	"github.com/urfave/cli/v2"
 	"os/signal"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -135,6 +136,16 @@ func onchange(c *cli.Context) error {
 		if ww, err := watch.NewTcpWatcher(strings.TrimPrefix(subject, "tcp://"),
 			c.Duration(intervalFlag.Name),
 			callback); err != nil {
+			return err
+		} else {
+			w = ww
+		}
+	} else if strings.HasPrefix(subject, "pid://") {
+		pid, err := strconv.Atoi(strings.TrimPrefix(subject, "pid://"))
+		if err != nil {
+			return err
+		}
+		if ww, err := watch.NewProcWatcher(pid, c.Duration(intervalFlag.Name), callback); err != nil {
 			return err
 		} else {
 			w = ww
